@@ -16,9 +16,21 @@ contract OptimisticRollup {
 
     mapping(address => Account) public accounts;
     
+    event Deposit(address indexed user, uint256 amount);
+
     constructor() { 
         currentStateRoot = keccak256(abi.encode(ENCODING));
         rollupBlockNumber = 0;
+    }
+
+    function deposit() external payable {
+        require(msg.value > 0, "Error: No ETH to be deposited");
+
+        // credit user's L2 balance & track total locked funds
+        accounts[msg.sender].balance += msg.value;
+        totalValueLocked += msg.value;
+
+        emit Deposit(msg.sender, msg.value);
     }
 
     function getCurrentState() external view returns (bytes32 stateRoot, uint256 blockNum) {

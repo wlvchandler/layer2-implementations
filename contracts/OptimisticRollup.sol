@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-
+ import "@openzeppelin/contracts/security/ReentrancyGuard.sol"; 
 contract OptimisticRollup is ReentrancyGuard {
     string constant ENCODING = "GENESIS";
 
@@ -25,6 +24,7 @@ contract OptimisticRollup is ReentrancyGuard {
         rollupBlockNumber = 0;
     }
 
+    // note: nonreentrant prevents deposit function from being called multiple times in a single tx
     function deposit() external payable nonReentrant {
         require(msg.value > 0, "Error: No ETH to be deposited");
 

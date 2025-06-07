@@ -5,6 +5,7 @@ pragma solidity ^0.8.19;
 contract OptimisticRollup is ReentrancyGuard {
     string constant ENCODING = "GENESIS";
     uint256 public constant OPERATOR_BOND = 1 ether;
+    uint256 public constant CHALLENGE_PERIOD = 50400; // ~7d @ 12s blocks
 
     bytes32 public currentStateRoot; // current state of all l2 accounts
     uint256 public rollupBlockNumber;
@@ -16,6 +17,7 @@ contract OptimisticRollup is ReentrancyGuard {
         uint256 blockNumber; // L1 block num when submitted
         uint256 timestamp; 
         address operator; // address that submitted
+        bool challenged;
         bool finalized;
     }
 
@@ -32,6 +34,8 @@ contract OptimisticRollup is ReentrancyGuard {
     // --- Events
     event Deposit(address indexed user, uint256 amount);
     event RollupBlockSubmitted(uint256 indexed blockNumber, bytes32 stateRoot, bytes32 txRoot, address operator);
+    event Challenge(uint256 indexed blockNumber, address challenger);
+    event BlockFinalized(uint256 indexed blockNumber);
 
     constructor() { 
         currentStateRoot = keccak256(abi.encode(ENCODING));
@@ -62,6 +66,7 @@ contract OptimisticRollup is ReentrancyGuard {
             blockNumber: block.number,
             timestamp: block.timestamp,
             operator: msg.sender,
+            challenged: false,
             finalized: false
         });
         operator_bonds[msg.sender] += msg.value;
@@ -74,6 +79,36 @@ contract OptimisticRollup is ReentrancyGuard {
         bytes32 computedRoot = keccak256(abi.encode(txs));
         return computedRoot == txRoot;
     }
+
+    // TODO: actually verify the fraud proof. for now just assumes any challenge is valid lol
+    function challengeBlock(uint256 blockNum, bytes calldata proof) external {
+        proof; // prevent compiler warn
+
+        RollupBlock storage rollupBlock = rollup_blocks[blockNum];
+        require(rollupBlock.operator != address(0), "Block does not exist");
+        require(!rollupBlock.finalized, "Block already finalized");
+        require(!rollupBlock.challenged, "Block already challenged");
+        
+        rollupBlock.challenged = true;
+
+        // slash operator bond
+        uint256 slashedAmount = operator_bonds[rollupBlock.operator];
+        operator_bonds[rollupBlock.operator] = 0;
+
+        // reward challenger with portion of slashed funds
+        uint256 challengerReward = slashedAmount / 2;
+        payable(msg.sender).transfer(challengerReward);
+
+        emit Challenge(blockNum, msg.sender);
+    }
+
+    // function finalizeBlock(uint256 blockNum) external {
+    //     RollupBlock storage rollupBlock = rollup_blocks[blockNum];
+    //     require(rollupBlock.operator != address(0), "Block does not exist");
+    //     require(!rollupBlock.finalized, "Block already finalized");
+    //     require(!rollupBlock.challenged, "Block was challenged");
+    //     require(block.number > rollupBlock.blockNumber + CHALLENGE_PERIOD, "Challenge period not expired");
+    // }
 
     function getCurrentState() external view returns (bytes32 stateRoot, uint256 blockNum) {
         return (currentStateRoot, rollupBlockNumber);

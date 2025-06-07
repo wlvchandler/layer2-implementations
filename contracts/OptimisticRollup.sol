@@ -24,4 +24,8 @@ contract OptimisticRollup {
     function getCurrentState() external view returns (bytes32 stateRoot, uint256 blockNum) {
         return (currentStateRoot, rollupBlockNumber);
     }
+
+    function getBalance(address user) external view returns (uint256) {
+        return accounts[user].balance;
+    }
 }

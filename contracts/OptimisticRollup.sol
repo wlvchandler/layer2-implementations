@@ -6,8 +6,17 @@ contract OptimisticRollup {
 
     bytes32 public currentStateRoot; // current state of all l2 accounts
     uint256 public rollupBlockNumber;
+    uint256 public totalValueLocked;
+
+    // L2 account structure
+    struct Account {
+        uint256 balance; // l2 eth balance
+        uint256 nonce; // tx counter
+    }
+
+    mapping(address => Account) public accounts;
     
-    constructor() {
+    constructor() { 
         currentStateRoot = keccak256(abi.encode(ENCODING));
         rollupBlockNumber = 0;
     }

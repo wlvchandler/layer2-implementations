@@ -2,11 +2,13 @@
 pragma solidity ^0.8.19;
 
 contract OptimisticRollup {
+    string constant ENCODING = "GENESIS";
+
     bytes32 public currentStateRoot; // current state of all l2 accounts
     uint256 public rollupBlockNumber;
     
     constructor() {
-        currentStateRoot = keccak256(abi.encode("GENESIS"));
+        currentStateRoot = keccak256(abi.encode(ENCODING));
         rollupBlockNumber = 0;
     }
 

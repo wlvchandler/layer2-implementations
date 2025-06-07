@@ -4,10 +4,20 @@ pragma solidity ^0.8.19;
  import "@openzeppelin/contracts/security/ReentrancyGuard.sol"; 
 contract OptimisticRollup is ReentrancyGuard {
     string constant ENCODING = "GENESIS";
+    uint256 public constant OPERATOR_BOND = 1 ether;
 
     bytes32 public currentStateRoot; // current state of all l2 accounts
     uint256 public rollupBlockNumber;
     uint256 public totalValueLocked;
+
+    struct RollupBlock {
+        bytes32 stateRoot; // post state root after batch execution
+        bytes32 txRoot; // merkle root of txs in this batch
+        uint256 blockNumber; // L1 block num when submitted
+        uint256 timestamp; 
+        address operator; // address that submitted
+        bool finalized;
+    }
 
     // L2 account structure
     struct Account {
@@ -16,6 +26,7 @@ contract OptimisticRollup is ReentrancyGuard {
     }
 
     mapping(address => Account) public accounts;
+    mapping (uint256 => RollupBlock) public rollup_blocks;
     
     event Deposit(address indexed user, uint256 amount);
 

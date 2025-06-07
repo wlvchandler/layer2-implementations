@@ -3,16 +3,18 @@ import {ethers} from "hardhat";
 import { HashZero } from "@ethersproject/constants";
 import {OptimisticRollup} from "../typechain-types";
 import {SignerWithAddress} from "@nomicfoundation/hardhat-ethers/signers";
+import { Signer } from "ethers";
 
 describe("OptimisticRollup", function() {
     let rollup: OptimisticRollup;
     let owner: SignerWithAddress;
     let user1: SignerWithAddress;
     let user2: SignerWithAddress;
+    let operator: SignerWithAddress;
 
     // get signers & deploy contract
     this.beforeEach(async function() {
-        [owner, user1, user2] = await ethers.getSigners();
+        [owner, user1, user2, operator] = await ethers.getSigners();
         const rollup_factory = await ethers.getContractFactory("OptimisticRollup");
         rollup = await rollup_factory.deploy();
         await rollup.waitForDeployment();
@@ -102,6 +104,92 @@ describe("OptimisticRollup", function() {
             const account = await rollup.accounts(user1.address);
             expect(account.balance).to.equal(depositAmount);
             expect(account.nonce).to.equal(0); // Should start at 0
+        });
+    });
+
+    describe("Batch Submission", function () {
+        const operatorBond = ethers.parseEther("1.0");
+        
+        beforeEach(async function () {
+        await rollup.connect(user1).deposit({ value: ethers.parseEther("5.0") });
+        await rollup.connect(user2).deposit({ value: ethers.parseEther("3.0") });
+        });
+
+        it("Should allow operators to submit valid batches", async function () {
+        const newStateRoot = ethers.keccak256(ethers.toUtf8Bytes("new-state"));
+        const transactions = [
+            ethers.toUtf8Bytes("tx1"),
+            ethers.toUtf8Bytes("tx2")
+        ];
+        const txRoot = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["bytes[]"], [transactions]));
+
+        await expect(rollup.connect(operator).submitRollupBlock(newStateRoot, txRoot, transactions, { value: operatorBond }))
+            .to.emit(rollup, "RollupBlockSubmitted")
+            .withArgs(1, newStateRoot, txRoot, operator.address);
+
+        const [currentStateRoot, blockNum] = await rollup.getCurrentState();
+        expect(currentStateRoot).to.equal(newStateRoot);
+        expect(blockNum).to.equal(1);
+
+        const rollupBlock = await rollup.getRollupBlock(1);
+        expect(rollupBlock.stateRoot).to.equal(newStateRoot);
+        expect(rollupBlock.txRoot).to.equal(txRoot);
+        expect(rollupBlock.operator).to.equal(operator.address);
+        expect(rollupBlock.finalized).to.be.false;
+        });
+
+        it("Should reject submissions without sufficient bond", async function () {
+        const newStateRoot = ethers.keccak256(ethers.toUtf8Bytes("new-state"));
+        const transactions = [ethers.toUtf8Bytes("tx1")];
+        const txRoot = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["bytes[]"], [transactions]));
+
+        await expect(rollup.connect(operator).submitRollupBlock(newStateRoot, txRoot, transactions, { value: ethers.parseEther("0.5") }))
+            .to.be.revertedWith("Insufficient bond");
+        });
+
+        it("Should reject invalid state roots", async function () {
+        const transactions = [ethers.toUtf8Bytes("tx1")];
+        const txRoot = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["bytes[]"], [transactions]));
+
+        await expect(rollup.connect(operator).submitRollupBlock(HashZero, txRoot, transactions, { value: operatorBond }))
+            .to.be.revertedWith("Invalid state root");
+        });
+
+        it("Should reject invalid transaction roots", async function () {
+        const newStateRoot = ethers.keccak256(ethers.toUtf8Bytes("new-state"));
+        const transactions = [ethers.toUtf8Bytes("tx1")];
+        const wrongtxRoot = ethers.keccak256(ethers.toUtf8Bytes("wrong"));
+
+        await expect(rollup.connect(operator).submitRollupBlock(newStateRoot, wrongtxRoot, transactions, { value: operatorBond }))
+            .to.be.revertedWith("Invalid tx root");
+        });
+
+        it("Should track operator bonds correctly", async function () {
+        const newStateRoot = ethers.keccak256(ethers.toUtf8Bytes("new-state"));
+        const transactions = [ethers.toUtf8Bytes("tx1")];
+        const txRoot = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["bytes[]"], [transactions]));
+
+        await rollup.connect(operator).submitRollupBlock(newStateRoot, txRoot, transactions, { value: operatorBond });
+
+        const bond = await rollup.getOperatorBond(operator.address);
+        expect(bond).to.equal(operatorBond);
+        });
+
+        it("Should handle multiple batch submissions", async function () {
+        const newStateRoot1 = ethers.keccak256(ethers.toUtf8Bytes("new-state-1"));
+        const newStateRoot2 = ethers.keccak256(ethers.toUtf8Bytes("new-state-2"));
+        const transactions = [ethers.toUtf8Bytes("tx1")];
+        const txRoot = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["bytes[]"], [transactions]));
+
+        await rollup.connect(operator).submitRollupBlock(newStateRoot1, txRoot, transactions, { value: operatorBond });
+        await rollup.connect(operator).submitRollupBlock(newStateRoot2, txRoot, transactions, { value: operatorBond });
+
+        const [currentStateRoot, blockNum] = await rollup.getCurrentState();
+        expect(currentStateRoot).to.equal(newStateRoot2);
+        expect(blockNum).to.equal(2);
+
+        const bond = await rollup.getOperatorBond(operator.address);
+        expect(bond).to.equal(operatorBond * 2n);
         });
     });
 });

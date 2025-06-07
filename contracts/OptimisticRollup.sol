@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-contract OptimisticRollup {
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract OptimisticRollup is ReentrancyGuard {
     string constant ENCODING = "GENESIS";
 
     bytes32 public currentStateRoot; // current state of all l2 accounts
@@ -23,7 +25,7 @@ contract OptimisticRollup {
         rollupBlockNumber = 0;
     }
 
-    function deposit() external payable {
+    function deposit() external payable nonReentrant {
         require(msg.value > 0, "Error: No ETH to be deposited");
 
         // credit user's L2 balance & track total locked funds

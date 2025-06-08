@@ -102,13 +102,22 @@ contract OptimisticRollup is ReentrancyGuard {
         emit Challenge(blockNum, msg.sender);
     }
 
-    // function finalizeBlock(uint256 blockNum) external {
-    //     RollupBlock storage rollupBlock = rollup_blocks[blockNum];
-    //     require(rollupBlock.operator != address(0), "Block does not exist");
-    //     require(!rollupBlock.finalized, "Block already finalized");
-    //     require(!rollupBlock.challenged, "Block was challenged");
-    //     require(block.number > rollupBlock.blockNumber + CHALLENGE_PERIOD, "Challenge period not expired");
-    // }
+    function finalizeBlock(uint256 blockNum) external {
+        RollupBlock storage rollupBlock = rollup_blocks[blockNum];
+        require(rollupBlock.operator != address(0), "Block does not exist");
+        require(!rollupBlock.finalized, "Block already finalized");
+        require(!rollupBlock.challenged, "Block was challenged");
+        require(block.number > rollupBlock.blockNumber + CHALLENGE_PERIOD, "Challenge period not expired");
+
+        rollupBlock.finalized = true;
+
+        // return operator bond
+        uint256 bondAmount = operator_bonds[rollupBlock.operator];
+        operator_bonds[rollupBlock.operator] = 0;
+        payable(rollupBlock.operator).transfer(bondAmount);
+
+        emit BlockFinalized(blockNum);
+    }
 
     function getCurrentState() external view returns (bytes32 stateRoot, uint256 blockNum) {
         return (currentStateRoot, rollupBlockNumber);
@@ -124,5 +133,24 @@ contract OptimisticRollup is ReentrancyGuard {
     
     function getOperatorBond(address operator) external view returns (uint256) {
         return operator_bonds[operator];
+    }
+
+    function canFinalizeOrChallenge(uint256 blockNum, bool finalize) internal view returns (bool) {
+        RollupBlock storage rollupBlock = rollup_blocks[blockNum];
+        bool valid_block_number = finalize ? block.number > rollupBlock.blockNumber + CHALLENGE_PERIOD : block.number <= rollupBlock.blockNumber + CHALLENGE_PERIOD;
+        return (
+            rollupBlock.operator != address(0) &&
+            !rollupBlock.finalized &&
+            !rollupBlock.challenged &&
+            valid_block_number
+        );
+    }
+    
+    function canFinalize(uint256 blockNum) external view returns (bool) {
+        return canFinalizeOrChallenge(blockNum, true);
+    }
+
+    function canChallenge(uint256 blockNum) external view returns (bool) {
+        return canFinalizeOrChallenge(blockNum, false);
     }
 }

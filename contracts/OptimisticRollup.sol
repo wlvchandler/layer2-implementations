@@ -27,15 +27,25 @@ contract OptimisticRollup is ReentrancyGuard {
         uint256 nonce; // tx counter
     }
 
+    struct WithdrawalRequest {
+        address user;
+        uint256 amount;
+        uint256 rollupBlock;
+        bool processed;
+    }
+
     mapping(address => Account) public accounts;
     mapping (uint256 => RollupBlock) public rollup_blocks;
     mapping(address => uint256) public operator_bonds;
+    mapping(bytes32 => WithdrawalRequest) public withdrawal_requests;
 
     // --- Events
     event Deposit(address indexed user, uint256 amount);
     event RollupBlockSubmitted(uint256 indexed blockNumber, bytes32 stateRoot, bytes32 txRoot, address operator);
     event Challenge(uint256 indexed blockNumber, address challenger);
     event BlockFinalized(uint256 indexed blockNumber);
+    event WithdrawalRequested(address indexed user, uint256 amount, bytes32 requestId);
+    event WithdrawalProcessed(address indexed user, uint256 amount);
 
     constructor() { 
         currentStateRoot = keccak256(abi.encode(ENCODING));
@@ -119,6 +129,37 @@ contract OptimisticRollup is ReentrancyGuard {
         emit BlockFinalized(blockNum);
     }
 
+    function requestWithdrawal(uint256 amount) external {
+        require(accounts[msg.sender].balance >= amount, "Insufficient balance");
+        require(amount > 0, "Amount must be positive");
+
+        bytes32 requestID = keccak256(abi.encode(msg.sender, amount, rollupBlockNumber, block.timestamp));
+        withdrawal_requests[requestID] = WithdrawalRequest({
+            user: msg.sender,
+            amount: amount,
+            rollupBlock: rollupBlockNumber,
+            processed: false
+        });
+
+        // deduct from L2 balance immediately
+        accounts[msg.sender].balance -= amount;
+        emit WithdrawalRequested(msg.sender, amount, requestID);
+    }
+
+    function processWithdrawal(bytes32 requestID) external nonReentrant {
+        WithdrawalRequest storage request = withdrawal_requests[requestID];
+        require(request.user != address(0), "Invalid withdrawal request");
+        require(!request.processed, "Withdrawal already processed");
+        require(request.user == msg.sender, "Not your withdrawal");
+        require(rollup_blocks[request.rollupBlock].finalized, "Rollup block not finalized");
+        
+        request.processed = true;
+        totalValueLocked -= request.amount;
+
+        payable(request.user).transfer(request.amount);
+        emit WithdrawalProcessed(request.user, request.amount);
+    }
+
     function getCurrentState() external view returns (bytes32 stateRoot, uint256 blockNum) {
         return (currentStateRoot, rollupBlockNumber);
     }
@@ -133,6 +174,10 @@ contract OptimisticRollup is ReentrancyGuard {
     
     function getOperatorBond(address operator) external view returns (uint256) {
         return operator_bonds[operator];
+    }
+
+    function getWithdrawalRequest(bytes32 requestId) external view returns (WithdrawalRequest memory) {
+        return withdrawal_requests[requestId];
     }
 
     function canFinalizeOrChallenge(uint256 blockNum, bool finalize) internal view returns (bool) {
@@ -152,5 +197,10 @@ contract OptimisticRollup is ReentrancyGuard {
 
     function canChallenge(uint256 blockNum) external view returns (bool) {
         return canFinalizeOrChallenge(blockNum, false);
+    }
+
+    function canProcessWithdrawal(bytes32 requestID) external view returns (bool) {
+        WithdrawalRequest storage request = withdrawal_requests[requestID];
+        return(request.user != address(0) && !request.processed && rollup_blocks[request.rollupBlock].finalized);
     }
 }

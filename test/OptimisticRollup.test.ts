@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 import { HashZero } from "@ethersproject/constants";
 import { OptimisticRollup } from "../typechain-types";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
-import { Signer } from "ethers";
+import { assert, Signer } from "ethers";
 
 describe("OptimisticRollup", function () {
     let rollup: OptimisticRollup;
@@ -20,6 +20,27 @@ describe("OptimisticRollup", function () {
         rollup = await rollup_factory.deploy();
         await rollup.waitForDeployment();
     });
+
+    async function getRequestIdFromTx(tx: any): Promise<string> {
+        const receipt = await tx.wait();
+        const event = receipt.logs.find((log: any) => {
+            try {
+                const parsed = rollup.interface.parseLog(log);
+                return parsed?.name === "WithdrawalRequested";
+            } catch {
+                return false;
+            }
+        });
+
+        if (!event) {
+            throw new Error("WithdrawalRequested event not found");
+        }
+
+        const parsed = rollup.interface.parseLog(event);
+        return parsed!.args[2]; // requestId
+    }
+
+
 
     describe("Deployment", function () {
         it("Should init with correct genesis state", async function () {
@@ -125,9 +146,7 @@ describe("OptimisticRollup", function () {
             ];
             const txRoot = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["bytes[]"], [transactions]));
 
-            await expect(rollup.connect(operator).submitRollupBlock(newStateRoot, txRoot, transactions, { value: operatorBond }))
-                .to.emit(rollup, "RollupBlockSubmitted")
-                .withArgs(1, newStateRoot, txRoot, operator.address);
+            await expect(rollup.connect(operator).submitRollupBlock(newStateRoot, txRoot, transactions, { value: operatorBond })).to.emit(rollup, "RollupBlockSubmitted").withArgs(1, newStateRoot, txRoot, operator.address);
 
             const [currentStateRoot, blockNum] = await rollup.getCurrentState();
             expect(currentStateRoot).to.equal(newStateRoot);
@@ -145,26 +164,20 @@ describe("OptimisticRollup", function () {
             const newStateRoot = ethers.keccak256(ethers.toUtf8Bytes("new-state"));
             const transactions = [ethers.toUtf8Bytes("tx1")];
             const txRoot = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["bytes[]"], [transactions]));
-
-            await expect(rollup.connect(operator).submitRollupBlock(newStateRoot, txRoot, transactions, { value: ethers.parseEther("0.5") }))
-                .to.be.revertedWith("Insufficient bond");
+            await expect(rollup.connect(operator).submitRollupBlock(newStateRoot, txRoot, transactions, { value: ethers.parseEther("0.5") })).to.be.revertedWith("Insufficient bond");
         });
 
         it("Should reject invalid state roots", async function () {
             const transactions = [ethers.toUtf8Bytes("tx1")];
             const txRoot = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["bytes[]"], [transactions]));
-
-            await expect(rollup.connect(operator).submitRollupBlock(HashZero, txRoot, transactions, { value: operatorBond }))
-                .to.be.revertedWith("Invalid state root");
+            await expect(rollup.connect(operator).submitRollupBlock(HashZero, txRoot, transactions, { value: operatorBond })).to.be.revertedWith("Invalid state root");
         });
 
         it("Should reject invalid transaction roots", async function () {
             const newStateRoot = ethers.keccak256(ethers.toUtf8Bytes("new-state"));
             const transactions = [ethers.toUtf8Bytes("tx1")];
             const wrongtxRoot = ethers.keccak256(ethers.toUtf8Bytes("wrong"));
-
-            await expect(rollup.connect(operator).submitRollupBlock(newStateRoot, wrongtxRoot, transactions, { value: operatorBond }))
-                .to.be.revertedWith("Invalid tx root");
+            await expect(rollup.connect(operator).submitRollupBlock(newStateRoot, wrongtxRoot, transactions, { value: operatorBond })).to.be.revertedWith("Invalid tx root");
         });
 
         it("Should track operator bonds correctly", async function () {
@@ -216,9 +229,7 @@ describe("OptimisticRollup", function () {
 
             expect(await rollup.canChallenge(blockNum)).to.be.true;
 
-            await expect(rollup.connect(challenger).challengeBlock(blockNum, fraudProof))
-                .to.emit(rollup, "Challenge")
-                .withArgs(blockNum, challenger.address);
+            await expect(rollup.connect(challenger).challengeBlock(blockNum, fraudProof)).to.emit(rollup, "Challenge").withArgs(blockNum, challenger.address);
 
             const rollupBlock = await rollup.getRollupBlock(blockNum);
             expect(rollupBlock.challenged).to.be.true;
@@ -231,31 +242,27 @@ describe("OptimisticRollup", function () {
 
             await rollup.connect(challenger).challengeBlock(blockNum, fraudProof);
 
-            // Operator bond should be slashed
+            // slash operator bond
             const operatorBond = await rollup.getOperatorBond(operator.address);
             expect(operatorBond).to.equal(0);
 
-            // Challenger should receive reward (50% of slashed amount)
+            // challenger should receive reward (50% of slashed amount)
             const challengerFinalBalance = await ethers.provider.getBalance(challenger.address);
             const expectedReward = ethers.parseEther("0.5"); // 50% of 1 ETH
 
-            // Account for gas costs in the check
+            // account for gas costs in the check
             expect(challengerFinalBalance).to.be.gt(challengerInitialBalance + expectedReward - ethers.parseEther("0.01"));
         });
 
         it("Should reject challenges on already challenged blocks", async function () {
             const fraudProof = ethers.toUtf8Bytes("fraud-proof-data");
-
             await rollup.connect(challenger).challengeBlock(blockNum, fraudProof);
-
             await expect(rollup.connect(challenger).challengeBlock(blockNum, fraudProof)).to.be.revertedWith("Block already challenged");
         });
 
         it("Should reject challenges on non-existent blocks", async function () {
             const fraudProof = ethers.toUtf8Bytes("fraud-proof-data");
-
-            await expect(rollup.connect(challenger).challengeBlock(999, fraudProof))
-                .to.be.revertedWith("Block does not exist");
+            await expect(rollup.connect(challenger).challengeBlock(999, fraudProof)).to.be.revertedWith("Block does not exist");
         });
     });
 
@@ -265,18 +272,15 @@ describe("OptimisticRollup", function () {
 
         beforeEach(async function () {
             await rollup.connect(user1).deposit({ value: ethers.parseEther("5.0") });
-
             const newStateRoot = ethers.keccak256(ethers.toUtf8Bytes("new-state"));
             const transactions = [ethers.toUtf8Bytes("tx1")];
             const transactionRoot = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["bytes[]"], [transactions]));
-
             await rollup.connect(operator).submitRollupBlock(newStateRoot, transactionRoot, transactions, { value: operatorBond });
             blockNum = 1;
         });
 
         it("Should reject finalization during challenge period", async function () {
             expect(await rollup.canFinalize(blockNum)).to.be.false;
-
             await expect(rollup.finalizeBlock(blockNum)).to.be.revertedWith("Challenge period not expired");
         });
 
@@ -313,19 +317,145 @@ describe("OptimisticRollup", function () {
 
             // Fast forward past challenge period
             await ethers.provider.send("hardhat_mine", ["0xc4e0"]);
-
-            await expect(rollup.finalizeBlock(blockNum))
-                .to.be.revertedWith("Block was challenged");
+            await expect(rollup.finalizeBlock(blockNum)).to.be.revertedWith("Block was challenged");
         });
 
         it("Should reject double finalization", async function () {
             // Fast forward past challenge period
             await ethers.provider.send("hardhat_mine", ["0xc4e0"]);
+            await rollup.finalizeBlock(blockNum);
+            await expect(rollup.finalizeBlock(blockNum)).to.be.revertedWith("Block already finalized");
+        });
+    });
 
+    describe("Withdrawal System", function () {
+        const operatorBond = ethers.parseEther("1.0");
+        const depositAmount = ethers.parseEther("5.0");
+        let blockNum: number;
+
+        beforeEach(async function () {
+            // User deposits
+            await rollup.connect(user1).deposit({ value: depositAmount });
+
+            // Operator submits a block
+            const newStateRoot = ethers.keccak256(ethers.toUtf8Bytes("new-state"));
+            const transactions = [ethers.toUtf8Bytes("tx1")];
+            const transactionRoot = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["bytes[]"], [transactions]));
+
+            await rollup.connect(operator).submitRollupBlock(newStateRoot, transactionRoot, transactions, { value: operatorBond });
+            blockNum = 1;
+        });
+
+        it("Should allow users to request withdrawals", async function () {
+            const withdrawAmount = ethers.parseEther("2.0");
+            const tx = await rollup.connect(user1).requestWithdrawal(withdrawAmount);
+
+            // Check L2 balance was reduced immediately
+            const l2Balance = await rollup.getBalance(user1.address);
+            expect(l2Balance).to.equal(depositAmount - withdrawAmount);
+        });
+
+        it("Should prevent withdrawals exceeding balance", async function () {
+            const withdrawAmount = ethers.parseEther("10.0"); // More than deposited
+            await expect(rollup.connect(user1).requestWithdrawal(withdrawAmount)).to.be.revertedWith("Insufficient balance");
+        });
+
+        it("Should prevent zero amount withdrawals", async function () {
+            await expect(rollup.connect(user1).requestWithdrawal(0)).to.be.revertedWith("Amount must be positive");
+        });
+
+        it("Should create withdrawal request with correct data", async function () {
+            const withdrawAmount = ethers.parseEther("2.0");
+            const tx = await rollup.connect(user1).requestWithdrawal(withdrawAmount);
+            const requestId = await getRequestIdFromTx(tx);
+            const request = await rollup.getWithdrawalRequest(requestId);
+            expect(request.user).to.equal(user1.address);
+            expect(request.amount).to.equal(withdrawAmount);
+            expect(request.rollupBlock).to.equal(blockNum); // References current block
+            expect(request.processed).to.be.false;
+        });
+
+        it("Should reject withdrawal processing before finalization", async function () {
+            const withdrawAmount = ethers.parseEther("2.0");
+
+            const tx = await rollup.connect(user1).requestWithdrawal(withdrawAmount);
+            const requestId = await getRequestIdFromTx(tx);
+
+            await expect(rollup.connect(user1).processWithdrawal(requestId)).to.be.revertedWith("Rollup block not finalized");
+        });
+
+        it("Should allow withdrawal processing after finalization", async function () {
+            const withdrawAmount = ethers.parseEther("2.0");
+
+            // Request withdrawal
+            const tx = await rollup.connect(user1).requestWithdrawal(withdrawAmount);
+            const requestId = await getRequestIdFromTx(tx);
+
+            // Fast forward past challenge period and finalize
+            await ethers.provider.send("hardhat_mine", ["0xc4e0"]);
             await rollup.finalizeBlock(blockNum);
 
-            await expect(rollup.finalizeBlock(blockNum))
-                .to.be.revertedWith("Block already finalized");
+            // Check user can process withdrawal
+            expect(await rollup.canProcessWithdrawal(requestId)).to.be.true;
+
+            const userInitialBalance = await ethers.provider.getBalance(user1.address);
+
+            await expect(rollup.connect(user1).processWithdrawal(requestId)).to.emit(rollup, "WithdrawalProcessed").withArgs(user1.address, withdrawAmount);
+
+            // ETH was transferred?
+            const userFinalBalance = await ethers.provider.getBalance(user1.address);
+            expect(userFinalBalance).to.be.gt(userInitialBalance + withdrawAmount - ethers.parseEther("0.01")); // Account for gas
+
+            // updated tvl?
+            const totalLocked = await rollup.totalValueLocked();
+            expect(totalLocked).to.equal(depositAmount - withdrawAmount);
+
+            // withdrawal marked as processed?
+            const request = await rollup.getWithdrawalRequest(requestId);
+            expect(request.processed).to.be.true;
+        });
+
+        it("Should reject double processing of withdrawal", async function () {
+            const withdrawAmount = ethers.parseEther("2.0");
+
+            const tx = await rollup.connect(user1).requestWithdrawal(withdrawAmount);
+            const requestId = await getRequestIdFromTx(tx);
+
+            // Finalize block
+            await ethers.provider.send("hardhat_mine", ["0xc4e0"]);
+            await rollup.finalizeBlock(blockNum);
+
+            // Process withdrawal once
+            await rollup.connect(user1).processWithdrawal(requestId);
+
+            // Try to process again
+            await expect(rollup.connect(user1).processWithdrawal(requestId)).to.be.revertedWith("Withdrawal already processed");
+        });
+
+        it("Should reject processing withdrawal of another user", async function () {
+            const withdrawAmount = ethers.parseEther("2.0");
+
+            const tx = await rollup.connect(user1).requestWithdrawal(withdrawAmount);
+            const requestId = await getRequestIdFromTx(tx);
+
+            await ethers.provider.send("hardhat_mine", ["0xc4e0"]);
+            await rollup.finalizeBlock(blockNum);
+            await expect(rollup.connect(user2).processWithdrawal(requestId)).to.be.revertedWith("Not your withdrawal");
+        });
+
+        it("Should handle withdrawal from challenged block", async function () {
+            const withdrawAmount = ethers.parseEther("2.0");
+
+            const tx = await rollup.connect(user1).requestWithdrawal(withdrawAmount);
+            const requestId = await getRequestIdFromTx(tx);
+
+            // challenge block & fast forward
+            const fraudProof = ethers.toUtf8Bytes("fraud-proof-data");
+            await rollup.connect(challenger).challengeBlock(blockNum, fraudProof);
+            await ethers.provider.send("hardhat_mine", ["0xc4e0"]);
+
+            await expect(rollup.finalizeBlock(blockNum)).to.be.revertedWith("Block was challenged");
+            await expect(rollup.connect(user1).processWithdrawal(requestId)).to.be.revertedWith("Rollup block not finalized");
         });
     });
 
@@ -340,11 +470,11 @@ describe("OptimisticRollup", function () {
 
             await rollup.connect(operator).submitRollupBlock(newStateRoot, transactionRoot, transactions, { value: operatorBond });
 
-            // Initially can challenge, cannot finalize
+            // initially can challenge, cannot finalize
             expect(await rollup.canChallenge(1)).to.be.true;
             expect(await rollup.canFinalize(1)).to.be.false;
 
-            // After challenge period
+            // after challenge period
             await ethers.provider.send("hardhat_mine", ["0xc4e1"]);
 
             expect(await rollup.canChallenge(1)).to.be.false;

@@ -482,4 +482,44 @@ describe("OptimisticRollup", function () {
         });
     });
 
+    describe("Integration Tests", function () {
+        it("Should handle full deposit -> batch -> withdraw cycle", async function () {
+            const operatorBond = ethers.parseEther("1.0");
+            const depositAmount = ethers.parseEther("5.0");
+            const withdrawAmount = ethers.parseEther("3.0");
+
+            // user deposits
+            await rollup.connect(user1).deposit({ value: depositAmount });
+            expect(await rollup.getBalance(user1.address)).to.equal(depositAmount);
+
+            // operator submits batch
+            const newStateRoot = ethers.keccak256(ethers.toUtf8Bytes("new-state"));
+            const transactions = [ethers.toUtf8Bytes("tx1")];
+            const transactionRoot = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["bytes[]"], [transactions]));
+
+            await rollup.connect(operator).submitRollupBlock(newStateRoot, transactionRoot, transactions, { value: operatorBond });
+
+            // user requests withdrawal
+            const tx = await rollup.connect(user1).requestWithdrawal(withdrawAmount);
+            const requestId = await getRequestIdFromTx(tx);
+
+            expect(await rollup.getBalance(user1.address)).to.equal(depositAmount - withdrawAmount);
+
+            // wait for finalization
+            await ethers.provider.send("hardhat_mine", ["0xc4e0"]);
+            await rollup.finalizeBlock(1);
+
+            // process withdrawal
+            const userInitialBalance = await ethers.provider.getBalance(user1.address);
+            await rollup.connect(user1).processWithdrawal(requestId);
+            const userFinalBalance = await ethers.provider.getBalance(user1.address);
+
+            expect(userFinalBalance).to.be.gt(userInitialBalance + withdrawAmount - ethers.parseEther("0.01"));
+            // tvl should be `deposit - withdrawal` = 5 ETH - 3 ETH = 2 ETH
+
+            // bond was returned during finalization
+            expect(await rollup.totalValueLocked()).to.equal(depositAmount - withdrawAmount);
+        });
+    });
+
 });

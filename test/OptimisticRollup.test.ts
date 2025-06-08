@@ -282,7 +282,7 @@ describe("OptimisticRollup", function () {
 
         it("Should allow finalization after challenge period", async function () {
             // fast forward past challenge period
-            await ethers.provider.send("hardhat_mine", ["0xc4e0"]); // mine 50400 blocks
+            await ethers.provider.send("hardhat_mine", ["0xc4e1"]); // mine 50400 blocks
 
             expect(await rollup.canFinalize(blockNum)).to.be.true;
             await expect(rollup.finalizeBlock(blockNum)).to.emit(rollup, "BlockFinalized").withArgs(blockNum);
@@ -345,7 +345,7 @@ describe("OptimisticRollup", function () {
             expect(await rollup.canFinalize(1)).to.be.false;
 
             // After challenge period
-            await ethers.provider.send("hardhat_mine", ["0xc4e0"]);
+            await ethers.provider.send("hardhat_mine", ["0xc4e1"]);
 
             expect(await rollup.canChallenge(1)).to.be.false;
             expect(await rollup.canFinalize(1)).to.be.true;

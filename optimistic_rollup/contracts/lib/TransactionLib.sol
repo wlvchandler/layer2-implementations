@@ -63,24 +63,24 @@ library TransactionLib {
     } 
 
     function verifySignature(Transaction memory txn) internal pure returns (bool) {
-        if (txn.signature.length != 65) return false;
+        if (txn.signature.length != 65) return false;
 
-        bytes32 txnHash = hash(txn);
-        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", txnHash));
-       
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-  
-        assembly {
-            r := mload(add(txn.signature, 32))
-            s := mload(add(txn.signature, 64))
-            v := byte(0, mload(add(txn.signature, 96)))
-        }
+        bytes32 txnHash = hash(txn);
+        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", txnHash));
+        
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
 
-        address recoveredSigner = ecrecover(ethSignedMessageHash, v, r, s);
-        return ((recoveredSigner==txn.from) && (recoveredSigner != address(0)));
-    }
+        bytes memory sig = txn.signature;
+        assembly {
+        r := mload(add(sig, 32))
+        s := mload(add(sig, 64))
+        v := byte(0, mload(add(sig, 96)))
+        }
+        address recoveredSigner = ecrecover(ethSignedMessageHash, v, r, s);
+        return ((recoveredSigner==txn.from) && (recoveredSigner != address(0)));
+}
 
     function validate(Transaction memory txn) internal pure returns(bool) {
         return( 

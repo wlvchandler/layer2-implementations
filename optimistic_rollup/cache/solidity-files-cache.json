@@ -185,6 +185,46 @@
       "artifacts": [
         "StateLib"
       ]
+    },
+    "/home/will/sol/layer2-implementations/optimistic_rollup/contracts/lib/FraudProofLib.sol": {
+      "lastModificationDate": 1754211426138,
+      "contentHash": "09ea76fa8fdf7e4aa25b0068cef121d7",
+      "sourceName": "contracts/lib/FraudProofLib.sol",
+      "solcConfig": {
+        "version": "0.8.28",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./TransactionLib.sol",
+        "./MerkleLib.sol",
+        "./StateLib.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.19"
+      ],
+      "artifacts": [
+        "FraudProofLib"
+      ]
     }
   }
 }

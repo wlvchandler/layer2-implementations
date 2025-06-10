@@ -1,0 +1,115 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+library TransactionLib {
+    struct Transaction {
+        address from;
+        address to;
+        uint256 amount;
+        uint256 nonce;
+        uint256 fee;
+        bytes signature;
+    }
+
+    struct Account {
+        uint256 balance; // l2 eth balance
+        uint256 nonce; // tx counter
+    }
+
+    enum TransactionResult {
+        SUCCESS,
+        INSUFFICIENT_BALANCE,
+        INVALID_NONCE,
+        INVALID_SIGNATURE
+    }
+
+    bytes32 private constant TRANSACTION_TYPEHASH = keccak256(
+        "Transaction(address from,address to,uint256 amount,uint256 nonce,uint256 fee)"
+    );
+
+    function serialize(Transaction memory txn) internal pure returns (bytes memory) {
+        return abi.encode(txn.from, txn.to, txn.amount, txn.nonce, txn.fee);
+    }
+
+    function deserialize(bytes memory data) internal pure returns (Transaction memory) {
+        (address from, address to, uint256 amount, uint256 nonce, uint256 fee) = abi.decode(data, (address, address, uint256, uint256, uint256));
+        return Transaction({
+            from: from,
+            to: to,
+            amount: amount,
+            nonce:nonce,
+            fee: fee,
+            signature: new bytes(0) //set separately
+        });
+    }
+
+    function hash(Transaction memory txn) internal pure returns (bytes32) {
+        return keccak256(abi.encode(
+            TRANSACTION_TYPEHASH, 
+            txn.from,
+            txn.to,
+            txn.amount,
+            txn.nonce,
+            txn.fee
+        ));
+    } 
+
+    // todo: implement
+    function verifySignature(Transaction memory txn) internal pure returns (bool) {
+        txn;
+        return true;
+    }
+
+    function validate(Transaction memory txn) internal pure returns(bool) {
+        return( 
+            txn.from != address(0)
+            && txn.to != address(0)
+            && txn.from != txn.to
+            && txn.amount > 0
+            && txn.fee >= 0
+        );
+    }
+
+    function execute(Transaction memory txn, Account memory fromAcct, Account memory toAcct) internal pure 
+        returns (Account memory newFromAcct, Account memory newToAcct, TransactionResult result) 
+    {
+        if (!validate(txn)) 
+            return (fromAcct, toAcct, TransactionResult.INVALID_SIGNATURE);
+
+        if (txn.nonce != fromAcct.nonce) 
+            return (fromAcct, toAcct, TransactionResult.INVALID_NONCE);
+    
+        uint256 totalCost = txn.amount + txn.fee;
+        if (fromAcct.balance < totalCost) 
+            return (fromAcct, toAcct, TransactionResult.INSUFFICIENT_BALANCE);
+
+        // execute 
+        newFromAcct = Account({
+            balance: fromAcct.balance - totalCost,
+            nonce: fromAcct.nonce + 1
+        });
+        
+        newToAcct = Account({
+            balance: toAcct.balance + txn.amount,
+            nonce: toAcct.nonce
+        });
+        
+        return (newFromAcct, newToAcct, TransactionResult.SUCCESS);
+    }
+
+    function canExecute(Transaction memory txn,Account memory fromAccount) internal pure returns (bool) {
+        if (!validate(txn)) return false;
+        if (txn.nonce != fromAccount.nonce) return false;
+        if (fromAccount.balance < txn.amount + txn.fee) return false;
+        return true;
+    }
+
+    function getExecutionCost(Transaction memory txn) internal pure returns (uint256) {
+        return txn.amount + txn.fee;
+    }
+
+    function getMerkleLeaf(Transaction memory txn) internal pure returns (bytes32) {
+        return keccak256(serialize(txn));
+    }
+
+}

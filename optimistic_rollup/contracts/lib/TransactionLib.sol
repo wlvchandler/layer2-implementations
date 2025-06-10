@@ -31,6 +31,14 @@ library TransactionLib {
         return abi.encode(txn.from, txn.to, txn.amount, txn.nonce, txn.fee);
     }
 
+    function serializeBatch(Transaction[] memory transactions) internal pure returns (bytes32[] memory leaves) {
+        leaves = new bytes32[](transactions.length);
+        for (uint256 i = 0; i < transactions.length; i++) {
+            leaves[i] = getMerkleLeaf(transactions[i]);
+        }
+        return leaves;
+    }
+
     function deserialize(bytes memory data) internal pure returns (Transaction memory) {
         (address from, address to, uint256 amount, uint256 nonce, uint256 fee) = abi.decode(data, (address, address, uint256, uint256, uint256));
         return Transaction({

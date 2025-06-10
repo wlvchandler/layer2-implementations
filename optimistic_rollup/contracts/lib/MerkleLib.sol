@@ -57,7 +57,7 @@ library MerkleLib {
     function generateProof(bytes32[] memory leaves, uint256 leafIndex) internal pure returns (MerkleProof memory) {
         require(leafIndex < leaves.length, "Leaf index out of bounds");
         
-        bytes32[] memory proof = new bytes32[](getProofLength(leaves.length));
+        bytes32[] memory proof = new bytes32[](getTreeDepth(leaves.length));
         uint256 proofIndex = 0;
         
         bytes32[] memory currentLevel = new bytes32[](leaves.length);
@@ -102,18 +102,32 @@ library MerkleLib {
         });
     }
 
+    function verifyMultiProof(bytes32[] memory leaves, bytes32 root, MerkleProof[] memory proofs) internal pure returns (bool) {
+        require(leaves.length == proofs.length, "Leaves and proofs length mismatch");
+        for (uint256 i = 0; i < leaves.length; i++) {
+            if (!verifyProof(leaves[i], root, proofs[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     function getSiblingIndex(uint256 index) internal pure returns (uint256) {
-        if (index % 2 == 0) {
+        if (index & 1 == 0) {
             return index + 1; // left child ==> sibling is right
         } else {
             return index - 1; // vice versa
         }
     }
 
-    // calc maximum proof length needed for tree with n leaves
-    function getProofLength(uint256 numLeaves) internal pure returns (uint256) {
+    function isValidTree(bytes32[] memory leaves, bytes32 expectedRoot) internal pure returns (bool) {
+        if (leaves.length == 0) return expectedRoot == bytes32(0);
+        bytes32 computedRoot = computeRoot(leaves);
+        return computedRoot == expectedRoot;
+    }
+
+    function getTreeDepth(uint256 numLeaves) internal pure returns (uint256) {
         if (numLeaves <= 1) return 0;
-        
         uint256 depth = 0;
         uint256 n = numLeaves;
         while (n > 1) {
@@ -121,5 +135,10 @@ library MerkleLib {
             depth++;
         }
         return depth;
+    }
+
+    function getInternalNodeCount(uint256 numLeaves) internal pure returns (uint256) {
+        if (numLeaves <= 1) return 0;
+        return numLeaves - 1;
     }
 }

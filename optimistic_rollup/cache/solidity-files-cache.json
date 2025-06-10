@@ -146,6 +146,45 @@
       "artifacts": [
         "MerkleLib"
       ]
+    },
+    "/home/will/sol/layer2-implementations/optimistic_rollup/contracts/lib/StateLib.sol": {
+      "lastModificationDate": 1754210518974,
+      "contentHash": "beb1e7d8adefc953c4f42c0542a89081",
+      "sourceName": "contracts/lib/StateLib.sol",
+      "solcConfig": {
+        "version": "0.8.28",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./TransactionLib.sol",
+        "./MerkleLib.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.26"
+      ],
+      "artifacts": [
+        "StateLib"
+      ]
     }
   }
 }

@@ -76,8 +76,8 @@
       ]
     },
     "/home/will/sol/layer2-implementations/optimistic_rollup/contracts/lib/TransactionLib.sol": {
-      "lastModificationDate": 1754205606639,
-      "contentHash": "c51ac38e77db8416d9012473a5fc7fbd",
+      "lastModificationDate": 1754208110434,
+      "contentHash": "08f061de3c5b964531e4b4b049619a74",
       "sourceName": "contracts/lib/TransactionLib.sol",
       "solcConfig": {
         "version": "0.8.28",
@@ -109,6 +109,42 @@
       ],
       "artifacts": [
         "TransactionLib"
+      ]
+    },
+    "/home/will/sol/layer2-implementations/optimistic_rollup/contracts/lib/MerkleLib.sol": {
+      "lastModificationDate": 1754209048758,
+      "contentHash": "c23a8e0f4bfe939e5383c83be08a5382",
+      "sourceName": "contracts/lib/MerkleLib.sol",
+      "solcConfig": {
+        "version": "0.8.28",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.26"
+      ],
+      "artifacts": [
+        "MerkleLib"
       ]
     }
   }

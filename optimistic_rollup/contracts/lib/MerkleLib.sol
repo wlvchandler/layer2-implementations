@@ -36,4 +36,21 @@ library MerkleLib {
         }
         return currentLevel[0];
     }
+
+    function verifyProof(bytes32 leaf, bytes32 root, MerkleProof memory proof) internal pure returns(bool) {
+        bytes32 computedHash = leaf;
+        uint256 index = proof.index;
+        for (uint256 i = 0; i < proof.proof.length; i++) {
+            bytes32 proofElement = proof.proof[i];
+
+            if (index & 1 == 0) { // current node is left child
+                computedHash = hashPair(computedHash, proofElement);
+            } else {
+                computedHash = hashPair(proofElement,computedHash);
+            }
+
+            index >> 1;
+        }
+        return computedHash == root;
+    }
 }

@@ -62,7 +62,7 @@ library TransactionLib {
         ));
     } 
 
-    // todo: will this need updating to work with eip-191 and eip-712?
+    // todo: will this need updating to work with eip-191 and eip-712?
     function verifySignature(Transaction memory txn) internal pure returns (bool) {
         if (txn.signature.length != 65) return false;
 

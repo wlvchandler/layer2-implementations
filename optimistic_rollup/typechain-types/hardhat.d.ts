@@ -17,23 +17,77 @@ declare module "hardhat/types/runtime" {
       name: "OptimisticRollup",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.OptimisticRollup__factory>;
+    getContractFactory(
+      name: "MerkleLibTest",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.MerkleLibTest__factory>;
+    getContractFactory(
+      name: "StateLibTest",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.StateLibTest__factory>;
+    getContractFactory(
+      name: "TransactionLibTest",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.TransactionLibTest__factory>;
 
     getContractAt(
       name: "OptimisticRollup",
       address: string | ethers.Addressable,
       signer?: ethers.Signer
     ): Promise<Contracts.OptimisticRollup>;
+    getContractAt(
+      name: "MerkleLibTest",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.MerkleLibTest>;
+    getContractAt(
+      name: "StateLibTest",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.StateLibTest>;
+    getContractAt(
+      name: "TransactionLibTest",
+      address: string | ethers.Addressable,
+      signer?: ethers.Signer
+    ): Promise<Contracts.TransactionLibTest>;
 
     deployContract(
       name: "OptimisticRollup",
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.OptimisticRollup>;
+    deployContract(
+      name: "MerkleLibTest",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.MerkleLibTest>;
+    deployContract(
+      name: "StateLibTest",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.StateLibTest>;
+    deployContract(
+      name: "TransactionLibTest",
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.TransactionLibTest>;
 
     deployContract(
       name: "OptimisticRollup",
       args: any[],
       signerOrOptions?: ethers.Signer | DeployContractOptions
     ): Promise<Contracts.OptimisticRollup>;
+    deployContract(
+      name: "MerkleLibTest",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.MerkleLibTest>;
+    deployContract(
+      name: "StateLibTest",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.StateLibTest>;
+    deployContract(
+      name: "TransactionLibTest",
+      args: any[],
+      signerOrOptions?: ethers.Signer | DeployContractOptions
+    ): Promise<Contracts.TransactionLibTest>;
 
     // default types
     getContractFactory(
